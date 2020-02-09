@@ -6,6 +6,8 @@ from  EERNNDataProcessor import EERNNDataProcessor
 import tensorflow as tf
 import os
 
+
+# 模型定义部分
 class EERNN(tf.keras.Model):
     def __init__(self,embedding_matrix,embedding_matrix2):
         super(EERNN, self).__init__()
@@ -81,6 +83,9 @@ class EERNN(tf.keras.Model):
         XX = tf.tile(x1, multiples=[BATCH_SIZE,data_target_one_hot.shape[1], 1, 1])
         hatt = tf.concat([ajhj , XX],-1)
         return hatt
+
+
+# 模型训练部分
 def cal_flat_target_logits(prediction,target_id,target_correctness):
     num_pro = prediction.shape[-2]
     prediction,target_id, target_correctness = prediction[:,:-1,:,:],target_id[:,1:],target_correctness[:,1:]
@@ -108,7 +113,7 @@ def train(DataName,TmpDir):
     # 周期数
     epochs = 10
     # 定义模型
-    decoder = Decoder(embedding_matrix, embedding_matrix2)
+    model = EERNN(embedding_matrix, embedding_matrix2)
     # 学习率
     lr = 0.01
     # 学习率衰减率
@@ -123,13 +128,13 @@ def train(DataName,TmpDir):
             data_target, _ = data
             loss = 0
             with tf.GradientTape() as tape:
-                X,cos_X =  decoder.call_encode(pro_dic)
+                X,cos_X =  model.call_encode(pro_dic)
                 # 计算预测值
-                prediction = decoder(data,pro_dic.shape[0],X,cos_X,trimatrix)
+                prediction = model(data,pro_dic.shape[0],X,cos_X,trimatrix)
                 # 计算损失值
                 loss += entroy_loss(prediction, data)
-            gradients = tape.gradient(loss, decoder.trainable_variables)
-            optimizer.apply_gradients(zip(gradients, decoder.trainable_variables))
+            gradients = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
             # 打印该批次损失
             batch_loss = (loss / int(data_target.shape[1]))
             if batch%100 == 0:
@@ -137,9 +142,9 @@ def train(DataName,TmpDir):
             os._exit(0)
         end = time.time()
         # 保存模型参数
-        decoder.save_weights('./model/my_model_'+str(epoch+1))
+        model.save_weights('./model/my_model_'+str(epoch+1))
         # 打印单个周期的时间消耗
         print("Epoch {} cost {}".format(epoch + 1, end - start))
 
 if __name__=='__main__':
-    train('hdu',"./Data/datapart/")
+    train('hdu',"./data/")
