@@ -1,21 +1,21 @@
 from hyper_params import *
 
-def choose_lstm(lstm_units):
+# def choose_lstm(lstm_units):
 
-    if tf.test.is_gpu_available():
-        return tf.keras.layers.CuDNNLSTM(
-            name="lstm",
-            units=lstm_units,
-            return_sequences=True,
-            return_state=False,
-        )
-    else:
-        return tf.keras.layers.LSTM(
-            name='lstm',
-            units=lstm_units,
-            return_sequences=True,
-        return_state = False,
-        )
+#     if tf.test.is_gpu_available():
+#         return tf.keras.layers.CuDNNLSTM(
+#             name="lstm",
+#             units=lstm_units,
+#             return_sequences=True,
+#             return_state=False,
+#         )
+#     else:
+#         return tf.keras.layers.LSTM(
+#             name='lstm',
+#             units=lstm_units,
+#             return_sequences=True,
+#         return_state = False,
+#         )
 
 
 class Decoder(tf.keras.Model):
@@ -80,17 +80,13 @@ class Decoder(tf.keras.Model):
         return x, cos_X
 
     def cosine(self, q, a):
-        # print('q,a',q.shape,a.shape)
         pooled_len_1 = tf.sqrt(tf.reduce_sum(tf.square(q), 1))
         pooled_len_2 = tf.sqrt(tf.reduce_sum(tf.square(a), 1))
         pooled_len_1 = tf.expand_dims(pooled_len_1, axis=0)
         pooled_len_2 = tf.expand_dims(pooled_len_2, axis=-1)
-        # print('pooled_len_1,,pooled_len_2',pooled_len_1.shape,pooled_len_2.shape)
         norm_matrix = tf.tensordot(pooled_len_2, pooled_len_1, [[1], [0]])
         dot_matrix = tf.tensordot(a, q, [[1], [1]])
-        # print('norm_matrix,dot_matrix',norm_matrix.shape,dot_matrix.shape)
         sim = dot_matrix / norm_matrix
-        # sim == (batch_size num_pro)
         return sim
 
     def call(self, data,num_pro,X,cos_X,trimatrix):

@@ -57,9 +57,7 @@ class OJDataProcessor(object):
     #如果处理的话,加上处理的进度条yy
     def RawSubmitRecord2CSV(self):
         if os.path.exists(self.TmpDir + self.DataName+'_RawSubmitRecord.csv'):
-            str = input("reRawSubmitRecord2CSV y/n：");
-            if str =='n':
-                return
+            return
         print('is RawSubmitRecord2CSV')
         count=0
 
@@ -144,7 +142,6 @@ class OJDataProcessor(object):
             judge = df.groupby(filter_id).apply(cal_pro)
             judge.drop_duplicates(subset=[filter_id], inplace=True)
             judge = judge[(judge['pro'] <filter_condition[2]) | (judge['pro'] >filter_condition[3])|(judge['total'] < filter_condition[0]) |(judge['total'] >filter_condition[1])]
-            #print(judge)
             return judge
 
 
@@ -205,11 +202,7 @@ class OJDataProcessor(object):
 
     #导入满足限制条件的数据，如果之前没有处理过直接调用FilterSubmitRecordData函数,如果处理过直接读取之前结果，构建4个dict以及合法的提交记录list。
     def LoadSubmitRecordData(self,userLC,problemLC,timeLC,OnlyRight):
-        if os.path.exists(self.TmpDir + self.DataName+self.LC2Str(userLC,problemLC,timeLC,OnlyRight) + '_EERNN_input.csv'):
-            str = input("ReLoadSubmitRecordData (if you change userLC,problemLC,timeLC,OnlyRight.or reRawSubmitRecord2CSV ,please input y) y/n：");
-            if str == 'y':
-                self.FilterSubmitRecordData(userLC, problemLC, timeLC,OnlyRight)
-        else:
+        if not os.path.exists(self.TmpDir + self.DataName+self.LC2Str(userLC,problemLC,timeLC,OnlyRight) + '_EERNN_input.csv'):
             self.FilterSubmitRecordData(userLC, problemLC, timeLC,OnlyRight)
         print('is LoadSubmitRecordData')
         with open(self.TmpDir + self.DataName+self.LC2Str(userLC,problemLC,timeLC,OnlyRight) + '_EERNN_input.csv','r') as f:
