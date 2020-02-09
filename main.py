@@ -52,18 +52,15 @@ def train(DataName,TmpDir):
                 X,cos_X =  decoder.call_encode(pro_dic)
                 # 计算预测值
                 prediction = decoder(data,pro_dic.shape[0],X,cos_X,trimatrix)
-                
                 # 计算损失值
                 loss += entroy_loss(prediction, data)
-            # 需要优化的参数
-            variables = decoder.lstm.variables + decoder.dense2.variables + decoder.dense1.variables + decoder.bi_lstm.variables
-            gradients = tape.gradient(loss, variables)
-            optimizer.apply_gradients(zip(gradients, variables))
-
+            gradients = tape.gradient(loss, decoder.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, decoder.trainable_variables))
             # 打印该批次损失
             batch_loss = (loss / int(data_target.shape[1]))
             if batch%100 == 0:
                 print("Epoch {} Batch {} Loss {:.4f}".format(epoch + 1, batch, batch_loss.numpy()))
+            os._exit(0)
         end = time.time()
         # 保存模型参数
         decoder.save_weights('./model/my_model_'+str(epoch+1))
