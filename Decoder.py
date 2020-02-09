@@ -1,45 +1,15 @@
 from hyper_params import *
 
-# def choose_lstm(lstm_units):
-
-#     if tf.test.is_gpu_available():
-#         return tf.keras.layers.CuDNNLSTM(
-#             name="lstm",
-#             units=lstm_units,
-#             return_sequences=True,
-#             return_state=False,
-#         )
-#     else:
-#         return tf.keras.layers.LSTM(
-#             name='lstm',
-#             units=lstm_units,
-#             return_sequences=True,
-#         return_state = False,
-#         )
-
-
 class Decoder(tf.keras.Model):
     def __init__(self,embedding_matrix,embedding_matrix2):
         super(Decoder, self).__init__()
-        self.lstm =tf.compat.v1.keras.layers.CuDNNLSTM(
-            name="lstm",
-            units=LSTM_UNITS,
-            return_sequences=True,
-            return_state=False,
-            kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.1549193338, maxval=0.1549193338),
-        )
+        self.lstm = tf.compat.v1.keras.layers.CuDNNLSTM(name="lstm", units=LSTM_UNITS, return_sequences=True, return_state=False,
+            kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.1549193338, maxval=0.1549193338))
         self.dropout = tf.keras.layers.Dropout(0.1)
-        self.dense1 = tf.keras.layers.Dense(
-            name='dense1',
-            units=50,
-            activation=tf.keras.activations.relu,
-            kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.1732050808, maxval=0.1732050808),
-        )
-        self.dense2 = tf.keras.layers.Dense(
-            name='dense2',
-            units=1,
-            kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.3429971703,maxval=0.3429971703),
-        )
+        self.dense1 = tf.keras.layers.Dense(name='dense1', units=50, activation=tf.keras.activations.relu,
+            kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.1732050808, maxval=0.1732050808))
+        self.dense2 = tf.keras.layers.Dense(name='dense2', units=1,
+            kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.3429971703,maxval=0.3429971703))
         self.sotfmax = tf.keras.layers.Softmax()
         self.embedding = tf.keras.layers.Embedding(
             #input_dim=NUM_WORDS,
@@ -61,8 +31,7 @@ class Decoder(tf.keras.Model):
             units=LSTM_UNITS,
             return_sequences=True,
             return_state=False,
-            kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.2,
-                                                                   maxval=0.2),
+            kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.2, maxval=0.2),
             kernel_regularizer=tf.keras.regularizers.l2(0.00004),
         ))	
 
@@ -96,11 +65,9 @@ class Decoder(tf.keras.Model):
         t_X = tf.tensordot(data_target_one_hot, X, [[2], [0]])
         t_X = tf.concat([t_X, t_X], axis=2)
         xt = tf.multiply(t_X, data_cor_embedding)
-        # xt == shape(batch_size, 1,4 * LSTM_UNITS)
 
         ht = self.lstm(xt)
         hatt= self.cal_hatt(ht,data_target_one_hot,X,cos_X,trimatrix)
-        #print('hatt',hatt)
         r = self.dense1(hatt)
         r = self.dense2(r)
         return r
@@ -110,14 +77,8 @@ class Decoder(tf.keras.Model):
         aj = tf.expand_dims(a,-1)
         hj = tf.expand_dims(ht,2)
         hidden = tf.multiply(aj,hj)
-        #zero = tf.zeros(shape=[BATCH_SIZE,1,cos_X.shape[0],LSTM_UNITS],dtype=tf.float32)
-        #hiden = tf.concat([zero,hidden],axis=1)
-        #hiden = hiden[:,:-1,:,:]
-        #ajhj = tf.add(hidden,hiden)
         ajhj = tf.tensordot(hidden,trimatrix,[[1],[0]])
-        #print('ajhj',ajhj.shape) (BATCH_SIZE,numpro,unitstate,maxstep)
         ajhj = tf.transpose(ajhj, [0, 3, 1,2])
-        #print('next',ajhj.shape) (BATCH_SIZE,maxstep,numpro,unitstate)
         x1 = tf.expand_dims(X, 0)
         x1 = tf.expand_dims(x1, 0)
         XX = tf.tile(x1, multiples=[BATCH_SIZE,data_target_one_hot.shape[1], 1, 1])
