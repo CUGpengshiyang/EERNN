@@ -4,8 +4,8 @@ from sklearn.metrics import roc_auc_score, precision_recall_fscore_support, accu
 import time
 import numpy as np
 from  EERNNDataProcessor import EERNNDataProcessor
+import tensorflow as tf
 import os
-
 
 def cal_flat_target_logits(prediction,target_id,target_correctness):
     num_pro = prediction.shape[-2]
