@@ -1,4 +1,3 @@
-from hyper_params import *
 from sklearn.metrics import roc_auc_score, precision_recall_fscore_support, accuracy_score
 import time
 import numpy as np
@@ -146,5 +145,13 @@ def train(DataName,TmpDir):
         # 打印单个周期的时间消耗
         print("Epoch {} cost {}".format(epoch + 1, end - start))
 
+NUM_WORDS = 5000
+BUFFER_SIZE = 12
+BATCH_SIZE = 8
+EMBEDDING_DIM = 50
+LSTM_UNITS = 50
+PREFETCH_SIZE = 128
+SHUFFLE_BUFFER_SIZE = 5120
+MAXLEN = 100
 if __name__=='__main__':
     train('hdu',"./data/")
