@@ -1,9 +1,3 @@
-import tensorflow as tf
-import numpy as np
-import os
-
-
-
 NUM_WORDS = 5000
 BUFFER_SIZE = 12
 BATCH_SIZE = 8
