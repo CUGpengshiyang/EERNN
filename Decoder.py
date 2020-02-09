@@ -3,7 +3,7 @@ from hyper_params import *
 class Decoder(tf.keras.Model):
     def __init__(self,embedding_matrix,embedding_matrix2):
         super(Decoder, self).__init__()
-        self.lstm = tf.compat.v1.keras.layers.CuDNNLSTM(name="lstm", units=LSTM_UNITS, return_sequences=True, return_state=False,
+        self.lstm = tf.keras.layers.LSTM(name="lstm", units=LSTM_UNITS, return_sequences=True, return_state=False,
             kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.1549193338, maxval=0.1549193338))
         self.dropout = tf.keras.layers.Dropout(0.1)
         self.dense1 = tf.keras.layers.Dense(name='dense1', units=50, activation=tf.keras.activations.relu,
@@ -11,26 +11,9 @@ class Decoder(tf.keras.Model):
         self.dense2 = tf.keras.layers.Dense(name='dense2', units=1,
             kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.3429971703,maxval=0.3429971703))
         self.sotfmax = tf.keras.layers.Softmax()
-        self.embedding = tf.keras.layers.Embedding(
-            #input_dim=NUM_WORDS,
-            input_dim=5111,
-            output_dim=EMBEDDING_DIM,
-            name="embedding",
-            weights=[embedding_matrix],
-            trainable=False,
-        )
-        self.embedding2 = tf.keras.layers.Embedding(
-            input_dim=2,
-            output_dim=4*LSTM_UNITS,
-            name="embedding2",
-            weights=[embedding_matrix2],
-            trainable=False,
-        )
-        self.bi_lstm = tf.keras.layers.Bidirectional(tf.compat.v1.keras.layers.CuDNNLSTM(
-            name="bi_lstm",
-            units=LSTM_UNITS,
-            return_sequences=True,
-            return_state=False,
+        self.embedding = tf.keras.layers.Embedding(input_dim=5111, output_dim=EMBEDDING_DIM, name="embedding", weights=[embedding_matrix], trainable=False)
+        self.embedding2 = tf.keras.layers.Embedding(input_dim=2, output_dim=4*LSTM_UNITS, name="embedding2", weights=[embedding_matrix2], trainable=False)
+        self.bi_lstm = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(name="bi_lstm", units=LSTM_UNITS, return_sequences=True, return_state=False,
             kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.2, maxval=0.2),
             kernel_regularizer=tf.keras.regularizers.l2(0.00004),
         ))	
