@@ -1,5 +1,5 @@
 from hyper_params import *
-
+import tensorflow as tf
 class Decoder(tf.keras.Model):
     def __init__(self,embedding_matrix,embedding_matrix2):
         super(Decoder, self).__init__()
