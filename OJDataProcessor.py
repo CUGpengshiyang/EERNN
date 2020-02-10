@@ -35,7 +35,7 @@ class OJDataProcessor(object):
     #临时文件夹位置
     TmpDir = ""
 
-    def __init__(self,DataName = 'hdu',TmpDir = 'E://Data/datapart/'):
+    def __init__(self,DataName = 'hdu',TmpDir = './data/'):
         self.DataName = DataName
         self.TmpDir = TmpDir
         self.Knowledge2ProblemPath = self.TmpDir + self.DataName + '_RawKnowledge2Problem.txt'
@@ -46,7 +46,6 @@ class OJDataProcessor(object):
         with open(self.hdu_partproblem,'r') as f:
             for line in f:
                 self.proid = line.strip().split(',')
-        print('self.proid',len(self.proid))
         self.RawSubmitRecord2CSV()
         self.RawKnowledge2CSV()
 
@@ -166,7 +165,6 @@ class OJDataProcessor(object):
         #filter end
         print('is writing to file')
         t = self.LC2Str(userLC,problemLC,timeLC,OnlyRight)
-        print(t)
         w_f1 = open(self.TmpDir + self.DataName+
                t+ '_userName2userId.pkl', 'wb' )
         w_f2 = open(self.TmpDir + self.DataName+
@@ -200,12 +198,15 @@ class OJDataProcessor(object):
         w_f1.close(),w_f2.close(),w_f3.close(),w_f4.close()
         print('FilterSubmitRecordData end')
 
-    #导入满足限制条件的数据，如果之前没有处理过直接调用FilterSubmitRecordData函数,如果处理过直接读取之前结果，构建4个dict以及合法的提交记录list。
+    #导入满足限制条件的数据，
+    #如果之前没有处理过直接调用FilterSubmitRecordData函数,如果处理过直接读取之前结果，
+    #构建4个dict以及合法的提交记录list。
     def LoadSubmitRecordData(self,userLC,problemLC,timeLC,OnlyRight):
-        if not os.path.exists(self.TmpDir + self.DataName+self.LC2Str(userLC,problemLC,timeLC,OnlyRight) + '_EERNN_input.csv'):
+        prefix = self.TmpDir + self.DataName+self.LC2Str(userLC, problemLC, timeLC, OnlyRight)
+        if not os.path.exists(prefix + '_EERNN_input.csv'):
             self.FilterSubmitRecordData(userLC, problemLC, timeLC,OnlyRight)
-        print('is LoadSubmitRecordData')
-        with open(self.TmpDir + self.DataName+self.LC2Str(userLC,problemLC,timeLC,OnlyRight) + '_EERNN_input.csv','r') as f:
+        print('LoadSubmitRecordData ...')
+        with open(prefix + '_EERNN_input.csv','r') as f:
             self.submitRecord.append([])
             for line in f:
                 fields = line.strip().split(',')
@@ -213,26 +214,17 @@ class OJDataProcessor(object):
                 while (student >= len(self.submitRecord)):
                     self.submitRecord.append([])
                 self.submitRecord[student].append([problem, is_correct])
-            print('is open(self.TmpDir +'+self.DataName+' _EERNN_input.csv')
-        f1 = open(self.TmpDir + self.DataName+self.LC2Str(userLC,problemLC,timeLC,OnlyRight)+ '_userName2userId.pkl', 'rb')
-        f2 = open(self.TmpDir + self.DataName+self.LC2Str(userLC,problemLC,timeLC,OnlyRight)+ '_userId2userName.pkl', 'rb')
-        f3 = open(self.TmpDir + self.DataName+self.LC2Str(userLC,problemLC,timeLC,OnlyRight)+ '_problemName2problemId.pkl', 'rb')
-        f4 = open(self.TmpDir + self.DataName+self.LC2Str(userLC,problemLC,timeLC,OnlyRight)+ '_problemId2problemName.pkl', 'rb')
-        self.userName2userId = pickle.load(f1)
-        self.userId2userName = pickle.load(f2)
-        self.problemName2problemId = pickle.load(f3)
-        self.problemId2problemName = pickle.load(f4)
-        f1.close(), f2.close(), f3.close(), f4.close()
+        with open(prefix + '_userName2userId.pkl', 'rb') as fr:
+            self.userName2userId = pickle.load(fr)
+        with open(prefix + '_userId2userName.pkl', 'rb') as fr:
+            self.userId2userName = pickle.load(fr)
+        with open(prefix + '_problemName2problemId.pkl', 'rb') as fr:
+            self.problemName2problemId = pickle.load(fr)
+        with open(prefix + '_problemId2problemName.pkl', 'rb') as fr:
+            self.problemId2problemName = pickle.load(fr)
 
 
-    #先判断之前是否计算过，没有的话根据4个dict以及合法的提交List构建时间-用户-提交Tensor以及QMatrix，构建后将构建结果存储在TmpDir里，每个文件名前缀为DataName+LC2Str(userLC,problemLC,timeLC),两个文件后缀自己取。
-    #不要忘记加进度条
-    def loadSumitAndQMatix(self):
-        pass
 if __name__ == "__main__":
-    tmp = OJDataProcessor()
-    tmp.LoadSubmitRecordData([15,1000000,0.06,1],[10,1000000,0.02,1],['2005-01-01 23:47:31','2019-01-02 11:21:49'],OnlyRight=True)
-    print(tmp.submitRecord)
-    print(tmp.userName2userId)
-    print(tmp.problemName2problemId)
-    print ("END")
+    pass
+    # tmp = ojdataprocessor()
+    # tmp.LoadSubmitRecordData([15,1000000,0.06,1],[10,1000000,0.02,1],['2005-01-01 23:47:31','2019-01-02 11:21:49'],OnlyRight=True)
