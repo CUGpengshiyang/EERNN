@@ -3,6 +3,7 @@ from OJProblemtextProcessor import OJProblemtextProcessor
 from sklearn.model_selection import train_test_split
 import numpy as np
 import tensorflow as tf
+import os
 
 class EERNNDataProcessor(object):
     def __init__(self, userLC, problemLC, timeLC, OnlyRight, DataName, TmpDir):
@@ -19,6 +20,8 @@ class EERNNDataProcessor(object):
                 seqs_ans[i] = self.OJData.submitRecord[i]
             else:
                 # 获取原有序列的长度
+                # 超过maxlen的部分需要进行截断
+                # 并添加到后面
                 nowId = len(self.OJData.submitRecord[i])
                 seqs_ans[i] = self.OJData.submitRecord[i][nowId - maxLen:nowId]
                 nowId -= maxLen
@@ -30,37 +33,30 @@ class EERNNDataProcessor(object):
                     np_sample += 1
                     nowId -= maxLen
         pro_dic,cor_dic = [],[]
-        for key in seqs_ans.keys():
-            pro ,cor= [],[]
-            for i in range(len(seqs_ans[key])):
-                pro.append(seqs_ans[key][i][0])
-                cor.append(seqs_ans[key][i][1])
-            pro_dic.append(pro)
-            cor_dic.append(cor)
-        print("----------------------------")
-        print(pro_dic[:10])
-        print("----------------------------")
-        print(cor_dic[:10])
-        print("----------------------------")
+        # pro_dic, 用于保存题目ID
+        # cor_dic, 用于保存题目对应的回答结果
+        for _, it in seqs_ans.items():
+            pro, cor = zip(*it)
+            pro_dic.append(list(pro))
+            cor_dic.append(list(cor))
+        # 未到最大值，在最后序列填充0
         tmp_pro = tf.keras.preprocessing.sequence.pad_sequences(pro_dic, value=0, padding='post', truncating='post',maxlen=maxLen)
         tmp_cor = tf.keras.preprocessing.sequence.pad_sequences(cor_dic, value=0, padding='post', truncating='post', maxlen=maxLen)
-        data = np.concatenate((tmp_pro, tmp_cor), axis=1)
-        train_data, test_data = train_test_split(data, test_size=0.2, random_state=0)
-        dataset_train_pro = tf.data.Dataset.from_tensor_slices(train_data[:, :maxLen])
-        dataset_train_cor = tf.data.Dataset.from_tensor_slices(train_data[:, maxLen:])
-        dataset_train = tf.data.Dataset.zip((dataset_train_pro, dataset_train_cor))
-        dataset_test_pro = tf.data.Dataset.from_tensor_slices(test_data[:, :maxLen])
-        dataset_test_cor = tf.data.Dataset.from_tensor_slices(test_data[:, maxLen:])
-        dataset_test = tf.data.Dataset.zip((dataset_test_pro, dataset_test_cor))
-        dataset_train = dataset_train.shuffle(buffer_size=tf.constant(SHUFFLE_BUFFER_SIZE, dtype=tf.int64)).batch(BATCH_SIZE, drop_remainder=True)
-        dataset_test = dataset_test.prefetch(PREFETCH_SIZE).batch(BATCH_SIZE, drop_remainder=True)
+        train_data = np.concatenate((tmp_pro, tmp_cor), axis=1)
+        # 题目ID
+        dataset_train_pro = tf.data.dataset.from_tensor_slices(train_data[:, :maxlen])
+        # 对应提交0,1
+        dataset_train_cor = tf.data.dataset.from_tensor_slices(train_data[:, maxlen:])
+        # 每个元素为 [[题目ID], [对应提交]]
+        dataset_train = tf.data.dataset.zip((dataset_train_pro, dataset_train_cor))
+        dataset_train = dataset_train.shuffle(buffer_size=SHUFFLE_BUFFER_SIZE).batch(BATCH_SIZE, drop_remainder=True)
         onehot_matrix = np.zeros((2, 4 * LSTM_UNITS))
         onehot_matrix[0] = [0] * 2 * LSTM_UNITS + [1] * 2 * LSTM_UNITS
         onehot_matrix[1] = [1] * 2 * LSTM_UNITS + [0] * 2 * LSTM_UNITS
         # 题目文本处理
         pro_dic, embedding_matrix = [], []
-        #pro_dic, embedding_matrix = self.OJProblem.Problem2Tensor()
-        return  pro_dic, embedding_matrix,dataset_train, dataset_test, onehot_matrix
+        # pro_dic, embedding_matrix = self.OJProblem.Problem2Tensor()
+        return  pro_dic, embedding_matrix, dataset_train,  onehot_matrix
 
 
 
