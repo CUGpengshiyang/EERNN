@@ -22,6 +22,7 @@ class EERNNDataProcessor(object):
                 # 获取原有序列的长度
                 # 超过maxlen的部分需要进行截断
                 # 并添加到后面
+                #  
                 nowId = len(self.OJData.submitRecord[i])
                 seqs_ans[i] = self.OJData.submitRecord[i][nowId - maxLen:nowId]
                 nowId -= maxLen
@@ -44,18 +45,17 @@ class EERNNDataProcessor(object):
         tmp_cor = tf.keras.preprocessing.sequence.pad_sequences(cor_dic, value=0, padding='post', truncating='post', maxlen=maxLen)
         train_data = np.concatenate((tmp_pro, tmp_cor), axis=1)
         # 题目ID
-        dataset_train_pro = tf.data.dataset.from_tensor_slices(train_data[:, :maxlen])
+        dataset_train_pro = tf.data.Dataset.from_tensor_slices(train_data[:, :maxLen])
         # 对应提交0,1
-        dataset_train_cor = tf.data.dataset.from_tensor_slices(train_data[:, maxlen:])
+        dataset_train_cor = tf.data.Dataset.from_tensor_slices(train_data[:, maxLen:])
         # 每个元素为 [[题目ID], [对应提交]]
-        dataset_train = tf.data.dataset.zip((dataset_train_pro, dataset_train_cor))
+        dataset_train = tf.data.Dataset.zip((dataset_train_pro, dataset_train_cor))
         dataset_train = dataset_train.shuffle(buffer_size=SHUFFLE_BUFFER_SIZE).batch(BATCH_SIZE, drop_remainder=True)
         onehot_matrix = np.zeros((2, 4 * LSTM_UNITS))
         onehot_matrix[0] = [0] * 2 * LSTM_UNITS + [1] * 2 * LSTM_UNITS
         onehot_matrix[1] = [1] * 2 * LSTM_UNITS + [0] * 2 * LSTM_UNITS
         # 题目文本处理
-        pro_dic, embedding_matrix = [], []
-        # pro_dic, embedding_matrix = self.OJProblem.Problem2Tensor()
+        pro_dic, embedding_matrix = self.OJProblem.Problem2Tensor()
         return  pro_dic, embedding_matrix, dataset_train,  onehot_matrix
 
 
@@ -73,5 +73,5 @@ if __name__ == "__main__":
     tmp_dir = './data/'
     DataProssor = EERNNDataProcessor([15,1000000,0.06,1], [10,1000000,0.02,1], ['2005-01-01 23:47:31','2019-01-02 11:21:49'], True, data_name, tmp_dir)
     # 获取处理好的数据
-    pro_dic, embedding_matrix, dataset, _, embedding_matrix2 = DataProssor.LoadEERNNData(BATCH_SIZE, PREFETCH_SIZE, SHUFFLE_BUFFER_SIZE, LSTM_UNITS, 100)
+    pro_dic, embedding_matrix, dataset, embedding_matrix2 = DataProssor.LoadEERNNData(BATCH_SIZE, PREFETCH_SIZE, SHUFFLE_BUFFER_SIZE, LSTM_UNITS, 100)
     print("END")
