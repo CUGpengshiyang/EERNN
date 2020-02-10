@@ -108,7 +108,7 @@ def train(DataName,TmpDir):
     # 定义数据处理器
     DataProssor = EERNNDataProcessor([15,1000000,0.06,1],[10,1000000,0.02,1],['2005-01-01 23:47:31','2019-01-02 11:21:49'],True,DataName,TmpDir)
     # 获取处理好的数据
-    pro_dic, embedding_matrix, dataset, _, embedding_matrix2 = DataProssor.LoadEERNNData(BATCH_SIZE, PREFETCH_SIZE, SHUFFLE_BUFFER_SIZE, LSTM_UNITS,100)
+    pro_dic, embedding_matrix, dataset, embedding_matrix2 = DataProssor.LoadEERNNData(BATCH_SIZE, PREFETCH_SIZE, SHUFFLE_BUFFER_SIZE, LSTM_UNITS,100)
     # 周期数
     epochs = 10
     # 定义模型
@@ -120,7 +120,6 @@ def train(DataName,TmpDir):
     print("Start training...")
     for epoch in range(epochs):
         optimizer = tf.keras.optimizers.Adam(lr * lr_decay ** epoch)
-        start = time.time()
         # 打乱数据集
         dataset.shuffle(BUFFER_SIZE)
         for batch, data in enumerate(dataset):
@@ -129,21 +128,18 @@ def train(DataName,TmpDir):
             with tf.GradientTape() as tape:
                 X,cos_X =  model.call_encode(pro_dic)
                 # 计算预测值
-                prediction = model(data,pro_dic.shape[0],X,cos_X,trimatrix)
+                prediction = model(data, pro_dic.shape[0], X, cos_X, trimatrix)
                 # 计算损失值
                 loss += entroy_loss(prediction, data)
-            gradients = tape.gradient(loss, model.trainable_variables)
-            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+            grad = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(grad, model.trainable_variables))
             # 打印该批次损失
             batch_loss = (loss / int(data_target.shape[1]))
             if batch%100 == 0:
                 print("Epoch {} Batch {} Loss {:.4f}".format(epoch + 1, batch, batch_loss.numpy()))
             os._exit(0)
-        end = time.time()
         # 保存模型参数
         model.save_weights('./model/my_model_'+str(epoch+1))
-        # 打印单个周期的时间消耗
-        print("Epoch {} cost {}".format(epoch + 1, end - start))
 
 if __name__=='__main__':
     NUM_WORDS = 5000
