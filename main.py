@@ -8,7 +8,7 @@ import os
 
 # 模型定义部分
 class EERNN(tf.keras.Model):
-    def __init__(self,embedding_matrix,embedding_matrix2):
+    def __init__(self,  embedding_matrix, onehot_matrix):
         super(EERNN, self).__init__()
         # LSTM 
         self.lstm = tf.keras.layers.LSTM(name="lstm", units=LSTM_UNITS, return_sequences=True, return_state=False,
@@ -26,34 +26,37 @@ class EERNN(tf.keras.Model):
 
         self.embedding = tf.keras.layers.Embedding(input_dim=5111, output_dim=EMBEDDING_DIM, name="embedding", weights=[embedding_matrix], trainable=False)
 
-        self.embedding2 = tf.keras.layers.Embedding(input_dim=2, output_dim=4*LSTM_UNITS, name="embedding2", weights=[embedding_matrix2], trainable=False)
+        self.embedding2 = tf.keras.layers.Embedding(input_dim=2, output_dim=4*LSTM_UNITS, name="embedding2", weights=[onehot_matrix], trainable=False)
 
         self.bi_lstm = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(name="bi_lstm", units=LSTM_UNITS, return_sequences=True, return_state=False,
             kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.2, maxval=0.2),
             kernel_regularizer=tf.keras.regularizers.l2(0.00004),
         ))	
 
-    def call_encode(self, pro_dic):
-        x = self.embedding(pro_dic)
-        if pro_dic.shape[0]<2000:
+    def call_encode(self, pid2seq):
+        # 将题目文本进行嵌入
+        # pid2seq :[483, 100]
+        # x: [483, 100, 50]
+        x = self.embedding(pid2seq)
+
+        if pid2seq.shape[0]<2000:
             x = self.bi_lstm(x)
         else:
             x1 = self.bi_lstm(x[0:2000, :, :])
             x2 = self.bi_lstm(x[2000:4000, :, :])
             x3 = self.bi_lstm(x[4000: ,:, :])
             x = tf.concat([x1, x2, x3], axis=0)
-        x = tf.compat.v1.reduce_max(x, axis=1, keep_dims=False, name=None)
-        cos_X = self.cosine(x, x)
-        return x, cos_X
+        x = tf.math.reduce_max(x, axis=1)
+        sim = self.cosine(x)
+        return x, sim 
 
-    def cosine(self, q, a):
-        pooled_len_1 = tf.sqrt(tf.reduce_sum(tf.square(q), 1))
-        pooled_len_2 = tf.sqrt(tf.reduce_sum(tf.square(a), 1))
-        pooled_len_1 = tf.expand_dims(pooled_len_1, axis=0)
-        pooled_len_2 = tf.expand_dims(pooled_len_2, axis=-1)
-        norm_matrix = tf.tensordot(pooled_len_2, pooled_len_1, [[1], [0]])
-        dot_matrix = tf.tensordot(a, q, [[1], [1]])
-        sim = dot_matrix / norm_matrix
+    def cosine(self, inputs):
+        num_vec = inputs.shape[0]
+        x = tf.expand_dims(inputs, axis=1)
+        x = tf.tile(x, [1, num_vec, 1])
+        y = tf.expand_dims(inputs, axis=0)
+        y = tf.tile(y, [num_vec, 1, 1])
+        sim = -1 * tf.keras.losses.cosine_similarity(x, y)
         return sim
 
     def call(self, data,num_pro,X,cos_X,trimatrix):
@@ -106,13 +109,13 @@ def train(DataName,TmpDir):
     trimatrix = np.tri(MAXLEN, MAXLEN, 0).T
     trimatrix = tf.cast(trimatrix, tf.float32)
     # 定义数据处理器
-    DataProssor = EERNNDataProcessor([15,1000000,0.06,1],[10,1000000,0.02,1],['2005-01-01 23:47:31','2019-01-02 11:21:49'],True,DataName,TmpDir)
+    data_processor = EERNNDataProcessor([15,1000000,0.06,1],[10,1000000,0.02,1],['2005-01-01 23:47:31','2019-01-02 11:21:49'],True,DataName,TmpDir)
     # 获取处理好的数据
-    pro_dic, embedding_matrix, dataset, embedding_matrix2 = DataProssor.LoadEERNNData(BATCH_SIZE, PREFETCH_SIZE, SHUFFLE_BUFFER_SIZE, LSTM_UNITS,100)
+    pid2seq, embedding_matrix, dataset, onehot_matrix = data_processor.LoadEERNNData(BATCH_SIZE, PREFETCH_SIZE, SHUFFLE_BUFFER_SIZE, LSTM_UNITS,100)
+    # 定义模型
+    model = EERNN(embedding_matrix, onehot_matrix)
     # 周期数
     epochs = 10
-    # 定义模型
-    model = EERNN(embedding_matrix, embedding_matrix2)
     # 学习率
     lr = 0.01
     # 学习率衰减率
@@ -126,9 +129,9 @@ def train(DataName,TmpDir):
             data_target, _ = data
             loss = 0
             with tf.GradientTape() as tape:
-                X,cos_X =  model.call_encode(pro_dic)
+                X,cos_X =  model.call_encode(pid2seq)
                 # 计算预测值
-                prediction = model(data, pro_dic.shape[0], X, cos_X, trimatrix)
+                prediction = model(data, pid2seq.shape[0], X, cos_X, trimatrix)
                 # 计算损失值
                 loss += entroy_loss(prediction, data)
             grad = tape.gradient(loss, model.trainable_variables)
@@ -153,3 +156,5 @@ if __name__=='__main__':
     data_name = 'hdu'
     tmp_dir = './data/'
     train(data_name, tmp_dir)
+
+
