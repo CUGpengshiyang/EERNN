@@ -1,5 +1,4 @@
 from sklearn.metrics import roc_auc_score, precision_recall_fscore_support, accuracy_score
-import time
 import numpy as np
 from  EERNNDataProcessor import EERNNDataProcessor
 import tensorflow as tf
@@ -10,7 +9,6 @@ import os
 class EERNN(tf.keras.Model):
     def __init__(self,  embedding_matrix, onehot_matrix):
         super(EERNN, self).__init__()
-        # LSTM 
         self.lstm = tf.keras.layers.LSTM(name="lstm", units=LSTM_UNITS, return_sequences=True, return_state=False,
             kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.1549193338, maxval=0.1549193338))
 
@@ -30,15 +28,15 @@ class EERNN(tf.keras.Model):
 
         self.bi_lstm = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(name="bi_lstm", units=LSTM_UNITS, return_sequences=True, return_state=False,
             kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.2, maxval=0.2),
-            kernel_regularizer=tf.keras.regularizers.l2(0.00004),
-        ))	
+            kernel_regularizer=tf.keras.regularizers.l2(0.00004)))
+
+
 
     def call_encode(self, pid2seq):
         # 将题目文本进行嵌入
         # pid2seq :[483, 100]
         # x: [483, 100, 50]
         x = self.embedding(pid2seq)
-
         if pid2seq.shape[0]<2000:
             x = self.bi_lstm(x)
         else:
@@ -47,10 +45,10 @@ class EERNN(tf.keras.Model):
             x3 = self.bi_lstm(x[4000: ,:, :])
             x = tf.concat([x1, x2, x3], axis=0)
         x = tf.math.reduce_max(x, axis=1)
-        sim = self.cosine(x)
+        sim = self.cosine_distance(x)
         return x, sim 
 
-    def cosine(self, inputs):
+    def cosine_distance(self, inputs):
         num_vec = inputs.shape[0]
         x = tf.expand_dims(inputs, axis=1)
         x = tf.tile(x, [1, num_vec, 1])
@@ -59,51 +57,50 @@ class EERNN(tf.keras.Model):
         sim = -1 * tf.keras.losses.cosine_similarity(x, y)
         return sim
 
-    def call(self, data,num_pro,X,cos_X,trimatrix):
-        data_target, data_cor = data
-        data_target_one_hot = tf.one_hot(data_target, num_pro)
-        data_cor_embedding = self.embedding2(data_cor)
-        t_X = tf.tensordot(data_target_one_hot, X, [[2], [0]])
-        t_X = tf.concat([t_X, t_X], axis=2)
-        xt = tf.multiply(t_X, data_cor_embedding)
-
+    def call(self, data, num_pro, X, cos_X, trimatrix):
+        pro_id, label = data
+        pro_id_one_hot = tf.one_hot(pro_id, num_pro)
+        label_embedding = self.embedding2(label)
+        # [batch, 题目序列， 题目词向量表达]
+        t_X = tf.matmul(pro_id_one_hot, X)
+        t_X = tf.tile(t_X, [1, 1, 2])
+        # [batch, 题目序列， 题目词向量与0,1拼接]
+        xt = tf.multiply(t_X, label_embedding)
         ht = self.lstm(xt)
-        hatt= self.cal_hatt(ht,data_target_one_hot,X,cos_X,trimatrix)
+        hatt= self.cal_hatt(ht, pro_id_one_hot, X, cos_X, trimatrix)
         r = self.dense1(hatt)
         r = self.dense2(r)
         return r
 
-    def cal_hatt(self,ht,data_target_one_hot,X,cos_X,trimatrix):
-        a = tf.tensordot(data_target_one_hot,cos_X,[[2],[0]])
-        aj = tf.expand_dims(a,-1)
-        hj = tf.expand_dims(ht,2)
-        hidden = tf.multiply(aj,hj)
-        ajhj = tf.tensordot(hidden,trimatrix,[[1],[0]])
-        ajhj = tf.transpose(ajhj, [0, 3, 1,2])
+    def cal_hatt(self, ht, pro_id_ont_hot, X, cos_X, trimatrix):
+        # 每一行为一个题目与其他题目向量的余弦值
+        a = tf.matmul(pro_id_ont_hot, cos_X)
+        aj = tf.expand_dims(a, -1)
+        hj = tf.expand_dims(ht, 2)
+        hidden = tf.multiply(aj, hj)
+        ajhj = tf.tensordot(hidden, trimatrix, [[1],[0]])
+        ajhj = tf.transpose(ajhj, [0, 3, 1, 2]) 
         x1 = tf.expand_dims(X, 0)
         x1 = tf.expand_dims(x1, 0)
-        XX = tf.tile(x1, multiples=[BATCH_SIZE,data_target_one_hot.shape[1], 1, 1])
-        hatt = tf.concat([ajhj , XX],-1)
+        XX = tf.tile(x1, multiples=[BATCH_SIZE, pro_id_ont_hot.shape[1], 1, 1])
+        hatt = tf.concat([ajhj , XX], -1)
         return hatt
 
-
-# 模型训练部分
-def cal_flat_target_logits(prediction,target_id,target_correctness):
+# 损失函数
+def entroy_loss(prediction, data):
+    target_id, target_correctness = data
     num_pro = prediction.shape[-2]
-    prediction,target_id, target_correctness = prediction[:,:-1,:,:],target_id[:,1:],target_correctness[:,1:]
+    prediction, target_id, target_correctness = prediction[:,:-1,:,:], target_id[:,1:], target_correctness[:,1:]
+    print(prediction.shape)
     flat_logits = tf.reshape(prediction, [-1])
     flat_target_correctness = tf.reshape(target_correctness, [-1])
     flat_bias_target_id = num_pro * tf.range(BATCH_SIZE * target_id.shape[-1])
     flat_target_id = tf.reshape(target_id, [-1])+flat_bias_target_id
     flat_target_logits = tf.gather(flat_logits, flat_target_id)
-    return flat_target_logits,flat_target_correctness
-
-# 损失函数
-def entroy_loss(prediction, data):
-    target_id, target_correctness = data
-    flat_target_logits, flat_target_correctness = cal_flat_target_logits(prediction, target_id, target_correctness)
     flat_target_correctness = tf.cast(flat_target_correctness,dtype=tf.float32)
-    return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=flat_target_correctness, logits=flat_target_logits))
+    loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=flat_target_correctness, logits=flat_target_logits))
+    os._exit(0)
+    return loss
 
 def train(DataName,TmpDir):
     trimatrix = np.tri(MAXLEN, MAXLEN, 0).T
@@ -126,7 +123,6 @@ def train(DataName,TmpDir):
         # 打乱数据集
         dataset.shuffle(BUFFER_SIZE)
         for batch, data in enumerate(dataset):
-            data_target, _ = data
             loss = 0
             with tf.GradientTape() as tape:
                 X,cos_X =  model.call_encode(pid2seq)
@@ -137,10 +133,9 @@ def train(DataName,TmpDir):
             grad = tape.gradient(loss, model.trainable_variables)
             optimizer.apply_gradients(zip(grad, model.trainable_variables))
             # 打印该批次损失
-            batch_loss = (loss / int(data_target.shape[1]))
+            batch_loss = (loss / BATCH_SIZE)
             if batch%100 == 0:
                 print("Epoch {} Batch {} Loss {:.4f}".format(epoch + 1, batch, batch_loss.numpy()))
-            os._exit(0)
         # 保存模型参数
         model.save_weights('./model/my_model_'+str(epoch+1))
 
@@ -156,5 +151,6 @@ if __name__=='__main__':
     data_name = 'hdu'
     tmp_dir = './data/'
     train(data_name, tmp_dir)
+
 
 
