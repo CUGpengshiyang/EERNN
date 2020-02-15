@@ -57,21 +57,6 @@ class EERNN(tf.keras.Model):
         sim = -1 * tf.keras.losses.cosine_similarity(x, y)
         return sim
 
-    def call(self, data, num_pro, X, cos_X, trimatrix):
-        pro_id, label = data
-        pro_id_one_hot = tf.one_hot(pro_id, num_pro)
-        label_embedding = self.embedding2(label)
-        # [batch, 题目序列， 题目词向量表达]
-        t_X = tf.matmul(pro_id_one_hot, X)
-        t_X = tf.tile(t_X, [1, 1, 2])
-        # [batch, 题目序列， 题目词向量与0,1拼接]
-        xt = tf.multiply(t_X, label_embedding)
-        ht = self.lstm(xt)
-        hatt= self.cal_hatt(ht, pro_id_one_hot, X, cos_X, trimatrix)
-        r = self.dense1(hatt)
-        r = self.dense2(r)
-        return r
-
     def cal_hatt(self, ht, pro_id_ont_hot, X, cos_X, trimatrix):
         # 每一行为一个题目与其他题目向量的余弦值
         a = tf.matmul(pro_id_ont_hot, cos_X)
@@ -86,20 +71,44 @@ class EERNN(tf.keras.Model):
         hatt = tf.concat([ajhj , XX], -1)
         return hatt
 
+    def call(self, data, num_pro, X, cos_X, trimatrix):
+        pro_id, label = data
+        pro_id_one_hot = tf.one_hot(pro_id, num_pro)
+        label_embedding = self.embedding2(label)
+        # [batch, 题目序列， 题目词向量表达]
+        t_X = tf.matmul(pro_id_one_hot, X)
+        t_X = tf.tile(t_X, [1, 1, 2])
+        # [batch, 题目序列， 题目词向量与0,1拼接]
+        xt = tf.multiply(t_X, label_embedding)
+        ht = self.lstm(xt)
+        hatt= self.cal_hatt(ht, pro_id_one_hot, X, cos_X, trimatrix)
+        r = self.dense1(hatt)
+        prediction = self.dense2(r)
+        return prediction
+
+
 # 损失函数
 def entroy_loss(prediction, data):
     target_id, target_correctness = data
-    num_pro = prediction.shape[-2]
-    prediction, target_id, target_correctness = prediction[:,:-1,:,:], target_id[:,1:], target_correctness[:,1:]
-    print(prediction.shape)
-    flat_logits = tf.reshape(prediction, [-1])
+
+    # 真实值
+    target_correctness = target_correctness[:, 1:]
     flat_target_correctness = tf.reshape(target_correctness, [-1])
+    flat_target_correctness = tf.cast(flat_target_correctness, dtype=tf.float32)
+
+    # 预测值
+    target_id = target_id[:, 1:]
+    num_pro = prediction.shape[-2]
+
+    # 计算偏移量
     flat_bias_target_id = num_pro * tf.range(BATCH_SIZE * target_id.shape[-1])
-    flat_target_id = tf.reshape(target_id, [-1])+flat_bias_target_id
+    # 获取预测数据所在ID
+    flat_target_id = tf.reshape(target_id, [-1]) + flat_bias_target_id
+    prediction = prediction[:, :-1, :, :]
+    flat_logits = tf.reshape(prediction, [-1])
     flat_target_logits = tf.gather(flat_logits, flat_target_id)
-    flat_target_correctness = tf.cast(flat_target_correctness,dtype=tf.float32)
+
     loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=flat_target_correctness, logits=flat_target_logits))
-    os._exit(0)
     return loss
 
 def train(DataName,TmpDir):
@@ -125,7 +134,10 @@ def train(DataName,TmpDir):
         for batch, data in enumerate(dataset):
             loss = 0
             with tf.GradientTape() as tape:
+                # pid2seq　保存了每道题目对应的词语ID　[pro_num, word_num]
                 X,cos_X =  model.call_encode(pid2seq)
+                # X 记录了每道题目对应的hatten
+                # cos_X 记录了每道题目对应的hatten之间的cosine
                 # 计算预测值
                 prediction = model(data, pid2seq.shape[0], X, cos_X, trimatrix)
                 # 计算损失值
@@ -136,8 +148,6 @@ def train(DataName,TmpDir):
             batch_loss = (loss / BATCH_SIZE)
             if batch%100 == 0:
                 print("Epoch {} Batch {} Loss {:.4f}".format(epoch + 1, batch, batch_loss.numpy()))
-        # 保存模型参数
-        model.save_weights('./model/my_model_'+str(epoch+1))
 
 if __name__=='__main__':
     NUM_WORDS = 5000
