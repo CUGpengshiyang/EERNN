@@ -22,7 +22,6 @@ class EERNNDataProcessor(object):
                 # 获取原有序列的长度
                 # 超过maxlen的部分需要进行截断
                 # 并添加到后面
-                #  
                 nowId = len(self.OJData.submitRecord[i])
                 seqs_ans[i] = self.OJData.submitRecord[i][nowId - maxLen:nowId]
                 nowId -= maxLen
@@ -55,9 +54,8 @@ class EERNNDataProcessor(object):
         onehot_matrix[0] = [0] * 2 * LSTM_UNITS + [1] * 2 * LSTM_UNITS
         onehot_matrix[1] = [1] * 2 * LSTM_UNITS + [0] * 2 * LSTM_UNITS
         # 题目文本处理
-        pro_dic, embedding_matrix = self.OJProblem.Problem2Tensor()
-        return  pro_dic, embedding_matrix, dataset_train,  onehot_matrix
-
+        pid2seq, embedding_matrix = self.OJProblem.Problem2Tensor()
+        return  pid2seq, embedding_matrix, dataset_train,  onehot_matrix
 
 
 if __name__ == "__main__":
